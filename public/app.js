@@ -1,12 +1,4 @@
-/**
- * ============================================================================
- * JAVASCRIPT CLOSURE: Quiz Controller & State Machine
- * Demonstrates closure encapsulation by keeping quiz state private and
- * exposing only controlled state-manipulation methods.
- * ============================================================================
- */
 function createQuizController(quizData) {
-  // --- Private Encapsulated State ---
   const { quizId, topic, username, questions } = quizData;
   let currentIndex = 0;
   const answers = {};
@@ -71,7 +63,6 @@ function createQuizController(quizData) {
       return { quizId, answers: { ...answers } };
     },
 
-    // Timer closure methods
     startTimer(onTickCallback) {
       secondsElapsed = 0;
       if (timerId) clearInterval(timerId);
@@ -93,19 +84,13 @@ function createQuizController(quizData) {
   };
 }
 
-// Global reference to active quiz closure instance
 let activeQuiz = null;
 let lastCompletedQuizId = null;
 
-// ============================================================================
-// DOM ELEMENTS
-// ============================================================================
 const dom = {
   dbStatusPill: document.getElementById('db-status-pill'),
   tabButtons: document.querySelectorAll('.tab-btn'),
   tabContents: document.querySelectorAll('.tab-content'),
-  
-  // Forms & Cards
   quizForm: document.getElementById('quiz-form'),
   topicInput: document.getElementById('topic-input'),
   usernameInput: document.getElementById('username-input'),
@@ -113,12 +98,9 @@ const dom = {
   generateBtn: document.getElementById('generate-btn'),
   btnText: document.querySelector('#generate-btn .btn-text'),
   btnLoader: document.querySelector('#generate-btn .btn-loader'),
-  
   generatorCard: document.getElementById('generator-card'),
   activeQuizCard: document.getElementById('active-quiz-card'),
   resultsCard: document.getElementById('results-card'),
-  
-  // Quiz Player
   quizTopicBadge: document.getElementById('quiz-topic-badge'),
   quizTitle: document.getElementById('quiz-title'),
   timerDisplay: document.getElementById('timer-display'),
@@ -128,29 +110,18 @@ const dom = {
   prevBtn: document.getElementById('prev-btn'),
   nextBtn: document.getElementById('next-btn'),
   submitQuizBtn: document.getElementById('submit-quiz-btn'),
-  
-  // Results
   scoreNumber: document.getElementById('score-number'),
   scorePercentage: document.getElementById('score-percentage'),
   resultsHeadline: document.getElementById('results-headline'),
   answersBreakdown: document.getElementById('answers-breakdown'),
   retakeBtn: document.getElementById('retake-btn'),
   viewSqlJoinedBtn: document.getElementById('view-sql-joined-btn'),
-  
-  // Joins Inspector & Leaderboard
   refreshJoinBtn: document.getElementById('refresh-join-btn'),
   joinsTbody: document.getElementById('joins-tbody'),
   refreshLeaderboardBtn: document.getElementById('refresh-leaderboard-btn'),
   leaderboardTbody: document.getElementById('leaderboard-tbody')
 };
 
-// ============================================================================
-// ASYNC API FUNCTIONS (Demonstrating JS async/await)
-// ============================================================================
-
-/**
- * Check backend & PostgreSQL status using async/await
- */
 async function checkSystemStatus() {
   try {
     const res = await fetch('/api/status');
@@ -168,9 +139,6 @@ async function checkSystemStatus() {
   }
 }
 
-/**
- * Handle Quiz Generation with async/await
- */
 async function handleGenerateQuiz(e) {
   e.preventDefault();
 
@@ -180,7 +148,6 @@ async function handleGenerateQuiz(e) {
 
   if (!topic) return;
 
-  // Toggle Loading UI
   dom.generateBtn.disabled = true;
   dom.btnText.classList.add('hidden');
   dom.btnLoader.classList.remove('hidden');
@@ -197,7 +164,6 @@ async function handleGenerateQuiz(e) {
       throw new Error(data.error || 'Failed to generate quiz');
     }
 
-    // Initialize Quiz Session via JavaScript Closure
     activeQuiz = createQuizController(data);
     startQuizSession();
 
@@ -210,9 +176,6 @@ async function handleGenerateQuiz(e) {
   }
 }
 
-/**
- * Handle Quiz Submission with async/await
- */
 async function handleSubmitQuiz() {
   if (!activeQuiz) return;
 
@@ -244,9 +207,6 @@ async function handleSubmitQuiz() {
   }
 }
 
-/**
- * Fetch SQL Multi-Table JOIN records with async/await
- */
 async function fetchJoinedDetails(quizId) {
   const targetId = quizId || lastCompletedQuizId;
   if (!targetId) {
@@ -282,9 +242,6 @@ async function fetchJoinedDetails(quizId) {
   }
 }
 
-/**
- * Fetch Leaderboard with SQL Aggregate Join (async/await)
- */
 async function fetchLeaderboard() {
   try {
     const response = await fetch('/api/leaderboard');
@@ -307,10 +264,6 @@ async function fetchLeaderboard() {
     console.error('Error fetching leaderboard:', err);
   }
 }
-
-// ============================================================================
-// UI RENDERING & QUIZ CONTROLLER INTERACTION
-// ============================================================================
 
 function startQuizSession() {
   dom.generatorCard.classList.add('hidden');
@@ -335,7 +288,6 @@ function renderCurrentQuestion() {
   dom.progressBar.style.width = `${((currIndex + 1) / total) * 100}%`;
   dom.questionText.textContent = currentQ.question;
 
-  // Render 4 Options
   dom.optionsGrid.innerHTML = '';
   const options = currentQ.options;
   for (const [key, text] of Object.entries(options)) {
@@ -352,7 +304,6 @@ function renderCurrentQuestion() {
     dom.optionsGrid.appendChild(optBtn);
   }
 
-  // Prev / Next / Submit button visibility
   dom.prevBtn.disabled = !activeQuiz.canGoPrev();
 
   if (activeQuiz.isLastQuestion()) {
@@ -398,10 +349,6 @@ function renderResults(evaluation) {
   `).join('');
 }
 
-// ============================================================================
-// EVENT LISTENERS & INITIALIZATION
-// ============================================================================
-
 dom.quizForm.addEventListener('submit', handleGenerateQuiz);
 
 dom.nextBtn.addEventListener('click', () => {
@@ -432,7 +379,6 @@ dom.viewSqlJoinedBtn.addEventListener('click', () => {
 dom.refreshJoinBtn.addEventListener('click', () => fetchJoinedDetails(lastCompletedQuizId));
 dom.refreshLeaderboardBtn.addEventListener('click', fetchLeaderboard);
 
-// Tab Switching
 function switchTab(tabId) {
   dom.tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   dom.tabContents.forEach(c => c.classList.toggle('active', c.id === tabId));
@@ -445,5 +391,4 @@ dom.tabButtons.forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
-// App Boot
 checkSystemStatus();

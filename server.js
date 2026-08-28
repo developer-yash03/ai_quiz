@@ -13,12 +13,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-/**
- * ============================================================================
- * JAVASCRIPT CLOSURE: Quiz Scoring & Performance Evaluator
- * Demonstrates closure by maintaining private score accumulator and audit log
- * ============================================================================
- */
 function createScoreEvaluator() {
   let processedCount = 0;
 
@@ -54,14 +48,6 @@ function createScoreEvaluator() {
 
 const scoreEvaluator = createScoreEvaluator();
 
-// ============================================================================
-// API ROUTES (Demonstrating JS async/await, SQL Joins & Relational Schema)
-// ============================================================================
-
-/**
- * 1. Generate Quiz & Save to PostgreSQL Relational Tables
- * Uses async/await and PK/FK relationships
- */
 app.post('/api/quiz/generate', async (req, res) => {
   try {
     const { topic, username = 'Anonymous', apiKey } = req.body;
@@ -69,7 +55,6 @@ app.post('/api/quiz/generate', async (req, res) => {
       return res.status(400).json({ error: 'Topic is required' });
     }
 
-    // Step A: Insert or get User (Parent Table)
     const userResult = await query(
       `INSERT INTO users (username) VALUES ($1)
        ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
@@ -78,10 +63,8 @@ app.post('/api/quiz/generate', async (req, res) => {
     );
     const user = userResult.rows[0];
 
-    // Step B: Generate 5 Structured MCQs using LLM with prompt engineering
     const mcqs = await generateMCQsWithLLM(topic.trim(), apiKey);
 
-    // Step C: Insert Quiz Record (Child Table referencing users.id as FK)
     const quizResult = await query(
       `INSERT INTO quizzes (user_id, topic, total_questions)
        VALUES ($1, $2, $3)
@@ -90,7 +73,6 @@ app.post('/api/quiz/generate', async (req, res) => {
     );
     const quiz = quizResult.rows[0];
 
-    // Step D: Insert 5 Questions (Child Table referencing quizzes.id as FK)
     const savedQuestions = [];
     for (const q of mcqs) {
       const qResult = await query(
@@ -102,7 +84,6 @@ app.post('/api/quiz/generate', async (req, res) => {
       savedQuestions.push(qResult.rows[0]);
     }
 
-    // Return to client (omit correct_answer for quiz integrity before submission)
     const clientQuestions = savedQuestions.map(q => ({
       id: q.id,
       question: q.question_text,
@@ -117,14 +98,10 @@ app.post('/api/quiz/generate', async (req, res) => {
       questions: clientQuestions
     });
   } catch (err) {
-    console.error('Quiz generation error:', err);
     res.status(500).json({ error: 'Failed to generate quiz', details: err.message });
   }
 });
 
-/**
- * 2. Submit Answers, Evaluate via Closure, & Store in PostgreSQL
- */
 app.post('/api/quiz/submit', async (req, res) => {
   try {
     const { quizId, answers } = req.body;
@@ -132,20 +109,16 @@ app.post('/api/quiz/submit', async (req, res) => {
       return res.status(400).json({ error: 'Quiz ID and answers are required' });
     }
 
-    // Retrieve questions for this quiz from PostgreSQL
     const questionsResult = await query(
       `SELECT id, question_text, correct_answer, explanation FROM questions WHERE quiz_id = $1`,
       [quizId]
     );
     const questions = questionsResult.rows;
 
-    // Evaluate answers using JS Closure
     const evaluation = scoreEvaluator(questions, answers);
 
-    // Update Quiz score in PostgreSQL
     await query(`UPDATE quizzes SET score = $1 WHERE id = $2`, [evaluation.score, quizId]);
 
-    // Save individual user answers into user_answers table with FKs
     for (const result of evaluation.results) {
       await query(
         `INSERT INTO user_answers (quiz_id, question_id, selected_answer, is_correct)
@@ -160,20 +133,14 @@ app.post('/api/quiz/submit', async (req, res) => {
       evaluation
     });
   } catch (err) {
-    console.error('Submit error:', err);
     res.status(500).json({ error: 'Submission failed', details: err.message });
   }
 });
 
-/**
- * 3. SQL JOIN Demo: Get Full Quiz Breakdown with Multi-Table Joins
- * Demonstrates: INNER JOIN & LEFT JOIN across 3 relational tables
- */
 app.get('/api/quiz/:id/details', async (req, res) => {
   try {
     const quizId = parseInt(req.params.id);
 
-    // Multi-table SQL JOIN: users + quizzes + questions + user_answers
     const sqlJoinQuery = `
       SELECT 
         q.id AS quiz_id,
@@ -202,15 +169,10 @@ app.get('/api/quiz/:id/details', async (req, res) => {
       data: result.rows
     });
   } catch (err) {
-    console.error('Details fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch details', details: err.message });
   }
 });
 
-/**
- * 4. SQL JOIN Demo: Leaderboard with Aggregation JOIN
- * Demonstrates: LEFT JOIN + COUNT + SUM + AVG + GROUP BY
- */
 app.get('/api/leaderboard', async (req, res) => {
   try {
     const leaderboardQuery = `
@@ -232,14 +194,10 @@ app.get('/api/leaderboard', async (req, res) => {
       leaderboard: result.rows
     });
   } catch (err) {
-    console.error('Leaderboard error:', err);
     res.status(500).json({ error: 'Failed to fetch leaderboard', details: err.message });
   }
 });
 
-/**
- * 5. Telemetry & Environment Status
- */
 app.get('/api/status', (req, res) => {
   res.json({
     postgresConnected: isConnectedToPostgres,
@@ -248,11 +206,10 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Start Server & Initialize Database
 async function startServer() {
   await initDB();
   app.listen(PORT, () => {
-    console.log(`🚀 AI Quiz Generator running at http://localhost:${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
   });
 }
 

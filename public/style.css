@@ -44,7 +44,6 @@ body {
   gap: 24px;
 }
 
-/* Header */
 .app-header {
   display: flex;
   align-items: center;
@@ -91,7 +90,6 @@ body {
   gap: 8px;
 }
 
-/* Badges & Chips */
 .badge {
   font-size: 12px;
   font-weight: 600;
@@ -123,7 +121,6 @@ body {
   font-family: var(--font-mono);
 }
 
-/* Navigation Tabs */
 .nav-tabs {
   display: flex;
   gap: 8px;
@@ -159,7 +156,6 @@ body {
   box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
 }
 
-/* Tab Content */
 .tab-content {
   display: none;
 }
@@ -174,7 +170,6 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Cards */
 .card {
   background: var(--card-bg);
   backdrop-filter: blur(12px);
@@ -205,7 +200,6 @@ body {
   gap: 12px;
 }
 
-/* Forms */
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -253,7 +247,6 @@ input[type="password"]:focus {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
 }
 
-/* Buttons */
 .btn {
   padding: 12px 22px;
   border-radius: var(--radius-sm);
@@ -312,7 +305,6 @@ input[type="password"]:focus {
   width: 100%;
 }
 
-/* Active Quiz View */
 .quiz-header {
   display: flex;
   justify-content: space-between;
@@ -421,7 +413,6 @@ input[type="password"]:focus {
   padding-top: 20px;
 }
 
-/* Results View */
 .results-header {
   display: flex;
   align-items: center;
@@ -492,7 +483,6 @@ input[type="password"]:focus {
   flex-wrap: wrap;
 }
 
-/* Code & Tables */
 .code-box {
   background: #060911;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -555,14 +545,12 @@ code {
 .text-muted { color: var(--text-muted); }
 .hidden { display: none !important; }
 
-/* Concepts Grid */
 .concepts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
 
-/* Footer */
 .app-footer {
   text-align: center;
   font-size: 13px;

@@ -11,7 +11,6 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
     <header class="app-header">
       <div class="logo-group">
         <div class="logo-icon">⚡</div>
@@ -26,7 +25,6 @@
       </div>
     </header>
 
-    <!-- Concept Chips -->
     <div class="concept-chips">
       <span class="chip">🤖 LLM API & Structured JSON</span>
       <span class="chip">📝 Prompt Engineering</span>
@@ -36,7 +34,6 @@
       <span class="chip">🔒 JS Closures</span>
     </div>
 
-    <!-- Navigation Tabs -->
     <nav class="nav-tabs">
       <button class="tab-btn active" data-tab="tab-generator">🎯 Quiz Studio</button>
       <button class="tab-btn" data-tab="tab-joins">🔍 SQL Joins Inspector</button>
@@ -44,9 +41,7 @@
       <button class="tab-btn" data-tab="tab-concepts">📚 Code Concepts</button>
     </nav>
 
-    <!-- TAB 1: Quiz Generator & Taking Section -->
     <main id="tab-generator" class="tab-content active">
-      <!-- Generation Form -->
       <section id="generator-card" class="card glass-card">
         <h2 class="card-title">Generate a 5-Question MCQ Quiz</h2>
         <p class="card-desc">Enter any topic. The system uses prompt engineering with structured JSON schema to generate 5 MCQs and stores them in PostgreSQL.</p>
@@ -76,7 +71,6 @@
         </form>
       </section>
 
-      <!-- Active Quiz Card (Hidden initially) -->
       <section id="active-quiz-card" class="card glass-card hidden">
         <div class="quiz-header">
           <div>
@@ -92,12 +86,9 @@
           <div id="quiz-progress-bar" class="progress-bar" style="width: 20%;"></div>
         </div>
 
-        <!-- Question Box -->
         <div class="question-container">
           <h3 id="current-question-text" class="question-text">Loading question...</h3>
-          <div id="options-grid" class="options-grid">
-            <!-- Options dynamically injected -->
-          </div>
+          <div id="options-grid" class="options-grid"></div>
         </div>
 
         <div class="quiz-actions">
@@ -107,7 +98,6 @@
         </div>
       </section>
 
-      <!-- Quiz Results Card (Hidden initially) -->
       <section id="results-card" class="card glass-card hidden">
         <div class="results-header">
           <div class="score-circle">
@@ -120,9 +110,7 @@
           </div>
         </div>
 
-        <div id="answers-breakdown" class="breakdown-list">
-          <!-- Breakdown injected dynamically -->
-        </div>
+        <div id="answers-breakdown" class="breakdown-list"></div>
 
         <div class="results-actions">
           <button id="retake-btn" class="btn btn-primary">Create Another Quiz</button>
@@ -131,7 +119,6 @@
       </section>
     </main>
 
-    <!-- TAB 2: SQL Joins Inspector -->
     <section id="tab-joins" class="tab-content">
       <div class="card glass-card">
         <div class="card-header-flex">
@@ -179,7 +166,6 @@ WHERE q.id = $1;</code></pre>
       </div>
     </section>
 
-    <!-- TAB 3: Leaderboard (Aggregate Join) -->
     <section id="tab-leaderboard" class="tab-content">
       <div class="card glass-card">
         <div class="card-header-flex">
@@ -224,18 +210,15 @@ ORDER BY total_score DESC;</code></pre>
       </div>
     </section>
 
-    <!-- TAB 4: Code Concepts Documentation -->
     <section id="tab-concepts" class="tab-content">
       <div class="concepts-grid">
-        <!-- Card 1: Closures -->
         <div class="card glass-card">
           <h3>🔒 1. JavaScript Closures</h3>
           <p class="text-muted">A closure gives an inner function access to an outer function's scope even after the outer function has returned.</p>
           <div class="code-box">
-            <pre><code>// Client & Server Closure Example:
-function createQuizSession(quizData) {
-  let currentIndex = 0; // Private state
-  const answers = {};   // Private state
+            <pre><code>function createQuizSession(quizData) {
+  let currentIndex = 0;
+  const answers = {};
 
   return {
     selectAnswer(qId, option) { answers[qId] = option; },
@@ -247,13 +230,11 @@ function createQuizSession(quizData) {
           </div>
         </div>
 
-        <!-- Card 2: Async/Await -->
         <div class="card glass-card">
           <h3>⚡ 2. JavaScript async / await</h3>
           <p class="text-muted">Allows writing asynchronous, non-blocking code cleanly without callback hell or nested promise chains.</p>
           <div class="code-box">
-            <pre><code>// Async/Await Database & LLM Workflow:
-app.post('/api/quiz/generate', async (req, res) => {
+            <pre><code>app.post('/api/quiz/generate', async (req, res) => {
   const user = await query('INSERT INTO users ...');
   const mcqs = await generateMCQsWithLLM(topic);
   const quiz = await query('INSERT INTO quizzes ...');
@@ -262,7 +243,6 @@ app.post('/api/quiz/generate', async (req, res) => {
           </div>
         </div>
 
-        <!-- Card 3: Relational Schema -->
         <div class="card glass-card">
           <h3>🗄️ 3. Relational Schema (PK & FK)</h3>
           <p class="text-muted">Enforces data consistency and referential integrity using <code>PRIMARY KEY</code> and <code>FOREIGN KEY</code> constraints with <code>ON DELETE CASCADE</code>.</p>
@@ -281,13 +261,11 @@ CREATE TABLE questions (
           </div>
         </div>
 
-        <!-- Card 4: Structured Outputs & Prompt Engineering -->
         <div class="card glass-card">
           <h3>🤖 4. LLM Structured Outputs</h3>
           <p class="text-muted">Directs the model to output strict JSON matching 5 questions with options A, B, C, D and explanations.</p>
           <div class="code-box">
-            <pre><code>// Prompt Engineering with Strict Schema:
-const prompt = `Generate 5 MCQs on "${topic}".
+            <pre><code>const prompt = `Generate 5 MCQs on "${topic}".
 Output ONLY JSON:
 [
   {
@@ -302,7 +280,6 @@ Output ONLY JSON:
       </div>
     </section>
 
-    <!-- Footer -->
     <footer class="app-footer">
       <span>AI Quiz Generator Showcase</span>
       <span>•</span>

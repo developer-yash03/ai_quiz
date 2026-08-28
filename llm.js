@@ -1,20 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-/**
- * ============================================================================
- * 1. JAVASCRIPT CLOSURE: Prompt Builder & Telemetry Tracker
- * Demonstrates closure by encapsulating private state (callCount, history)
- * inside a higher-order function that returns the builder methods.
- * ============================================================================
- */
 export function createPromptBuilder(defaultModel = 'gemini-1.5-flash') {
-  // Private variables closed over by the returned functions
   let callCount = 0;
   const history = [];
 
   return {
-    // Generates engineered prompt with strict schema constraints
     buildPrompt(topic) {
       callCount++;
       const promptText = `
@@ -47,28 +38,18 @@ REQUIRED JSON FORMAT:
       return promptText;
     },
 
-    // Getter demonstrating access to encapsulated closure state
     getStats() {
       return { totalPromptCalls: callCount, historyCount: history.length, model: defaultModel };
     }
   };
 }
 
-// Instantiate the prompt builder closure
 export const promptEngine = createPromptBuilder('gemini-1.5-flash');
 
-/**
- * ============================================================================
- * 2. LLM API INTEGRATION & STRUCTURED OUTPUTS (with JS async/await)
- * Integrates with Google Gemini API / OpenAI API, using JSON structured response.
- * Includes smart fallback if API key is not yet set.
- * ============================================================================
- */
 export async function generateMCQsWithLLM(topic, customApiKey = null) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
   const prompt = promptEngine.buildPrompt(topic);
 
-  // If Gemini API Key is provided
   if (apiKey && (apiKey.startsWith('AIza') || process.env.GEMINI_API_KEY)) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -100,7 +81,6 @@ export async function generateMCQsWithLLM(topic, customApiKey = null) {
     }
   }
 
-  // If OpenAI API Key is provided
   if (apiKey && apiKey.startsWith('sk-')) {
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -130,13 +110,9 @@ export async function generateMCQsWithLLM(topic, customApiKey = null) {
     }
   }
 
-  // Educational Fallback Generator: Creates 5 contextual questions for instant testing
   return generateTopicFallbackMCQs(topic);
 }
 
-/**
- * High quality contextual fallback questions when running without an API key
- */
 function generateTopicFallbackMCQs(topic) {
   const t = topic.trim();
   return [
