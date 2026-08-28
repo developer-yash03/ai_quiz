@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Quiz Generator | PostgreSQL, LLM & JS Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1 class="logo-title">AI Quiz Generator</h1>
+          <p class="logo-subtitle">LLM Structured Outputs • PostgreSQL Relational Schema & Joins • JS Closures & Async/Await</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span id="db-status-pill" class="badge badge-warning">Checking DB...</span>
+        <span class="badge badge-info">5 MCQs / Topic</span>
+      </div>
+    </header>
+
+    <!-- Concept Chips -->
+    <div class="concept-chips">
+      <span class="chip">🤖 LLM API & Structured JSON</span>
+      <span class="chip">📝 Prompt Engineering</span>
+      <span class="chip">🗄️ Relational Schema (PK / FK)</span>
+      <span class="chip">🔗 SQL INNER & LEFT JOINs</span>
+      <span class="chip">⚡ JS async / await</span>
+      <span class="chip">🔒 JS Closures</span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-generator">🎯 Quiz Studio</button>
+      <button class="tab-btn" data-tab="tab-joins">🔍 SQL Joins Inspector</button>
+      <button class="tab-btn" data-tab="tab-leaderboard">🏆 Leaderboard (JOIN)</button>
+      <button class="tab-btn" data-tab="tab-concepts">📚 Code Concepts</button>
+    </nav>
+
+    <!-- TAB 1: Quiz Generator & Taking Section -->
+    <main id="tab-generator" class="tab-content active">
+      <!-- Generation Form -->
+      <section id="generator-card" class="card glass-card">
+        <h2 class="card-title">Generate a 5-Question MCQ Quiz</h2>
+        <p class="card-desc">Enter any topic. The system uses prompt engineering with structured JSON schema to generate 5 MCQs and stores them in PostgreSQL.</p>
+        
+        <form id="quiz-form" class="form-grid">
+          <div class="form-group">
+            <label for="topic-input">Topic</label>
+            <input type="text" id="topic-input" placeholder="e.g. JavaScript Closures, Quantum Computing, World War II..." required value="JavaScript Closures">
+          </div>
+
+          <div class="form-group">
+            <label for="username-input">Your Name</label>
+            <input type="text" id="username-input" placeholder="e.g. Alex" value="Alex">
+          </div>
+
+          <div class="form-group full-width">
+            <label for="apikey-input" class="optional-label">
+              Gemini / OpenAI API Key <span>(Optional - Built-in fallback generator active if blank)</span>
+            </label>
+            <input type="password" id="apikey-input" placeholder="Optional API Key">
+          </div>
+
+          <button type="submit" id="generate-btn" class="btn btn-primary full-width">
+            <span class="btn-text">Generate 5 MCQs with AI</span>
+            <span class="btn-loader hidden">⏳ Generating structured quiz...</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Active Quiz Card (Hidden initially) -->
+      <section id="active-quiz-card" class="card glass-card hidden">
+        <div class="quiz-header">
+          <div>
+            <span class="badge badge-accent" id="quiz-topic-badge">Topic</span>
+            <h2 id="quiz-title" class="quiz-title">Question 1 of 5</h2>
+          </div>
+          <div class="quiz-timer-pill" id="quiz-timer">
+            ⏱️ <span id="timer-display">00:00</span>
+          </div>
+        </div>
+
+        <div class="progress-bar-container">
+          <div id="quiz-progress-bar" class="progress-bar" style="width: 20%;"></div>
+        </div>
+
+        <!-- Question Box -->
+        <div class="question-container">
+          <h3 id="current-question-text" class="question-text">Loading question...</h3>
+          <div id="options-grid" class="options-grid">
+            <!-- Options dynamically injected -->
+          </div>
+        </div>
+
+        <div class="quiz-actions">
+          <button id="prev-btn" class="btn btn-secondary" disabled>← Previous</button>
+          <button id="next-btn" class="btn btn-secondary">Next →</button>
+          <button id="submit-quiz-btn" class="btn btn-success hidden">Submit & Score Quiz 🚀</button>
+        </div>
+      </section>
+
+      <!-- Quiz Results Card (Hidden initially) -->
+      <section id="results-card" class="card glass-card hidden">
+        <div class="results-header">
+          <div class="score-circle">
+            <span id="score-number">0/5</span>
+            <span id="score-percentage">0%</span>
+          </div>
+          <div>
+            <h2 id="results-headline">Quiz Completed!</h2>
+            <p id="results-subtext">Detailed breakdown and SQL relational records.</p>
+          </div>
+        </div>
+
+        <div id="answers-breakdown" class="breakdown-list">
+          <!-- Breakdown injected dynamically -->
+        </div>
+
+        <div class="results-actions">
+          <button id="retake-btn" class="btn btn-primary">Create Another Quiz</button>
+          <button id="view-sql-joined-btn" class="btn btn-secondary">Inspect SQL Joined Data 🔍</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 2: SQL Joins Inspector -->
+    <section id="tab-joins" class="tab-content">
+      <div class="card glass-card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">Relational Schema & SQL Joins Inspector</h2>
+            <p class="card-desc">Execute a live multi-table JOIN query (<code>quizzes</code> ⋈ <code>users</code> ⋈ <code>questions</code> ⋈ <code>user_answers</code>).</p>
+          </div>
+          <button id="refresh-join-btn" class="btn btn-sm btn-secondary">🔄 Run SQL Join</button>
+        </div>
+
+        <div class="code-box">
+          <div class="code-box-header">SQL QUERY (INNER JOIN + LEFT JOIN)</div>
+          <pre><code id="join-sql-code">SELECT 
+  q.id AS quiz_id, q.topic, q.score, u.username,
+  k.id AS question_id, k.question_text, k.options, k.correct_answer,
+  a.selected_answer, a.is_correct
+FROM quizzes q
+INNER JOIN users u ON q.user_id = u.id
+INNER JOIN questions k ON q.id = k.quiz_id
+LEFT JOIN user_answers a ON k.id = a.question_id AND q.id = a.quiz_id
+WHERE q.id = $1;</code></pre>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="joins-table">
+            <thead>
+              <tr>
+                <th>Quiz ID (PK)</th>
+                <th>Topic</th>
+                <th>Username (FK: users)</th>
+                <th>Q#</th>
+                <th>Question Text</th>
+                <th>Correct Ans</th>
+                <th>User Ans</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="joins-tbody">
+              <tr>
+                <td colspan="8" class="text-center text-muted">Generate and complete a quiz first to inspect joined relational rows.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Leaderboard (Aggregate Join) -->
+    <section id="tab-leaderboard" class="tab-content">
+      <div class="card glass-card">
+        <div class="card-header-flex">
+          <div>
+            <h2 class="card-title">User Performance Leaderboard</h2>
+            <p class="card-desc">Demonstrates SQL aggregate function with <code>LEFT JOIN</code>, <code>COUNT()</code>, <code>SUM()</code>, and <code>GROUP BY</code>.</p>
+          </div>
+          <button id="refresh-leaderboard-btn" class="btn btn-sm btn-secondary">🔄 Refresh</button>
+        </div>
+
+        <div class="code-box">
+          <div class="code-box-header">AGGREGATE SQL JOIN QUERY</div>
+          <pre><code>SELECT 
+  u.username,
+  COUNT(q.id) AS total_quizzes_taken,
+  COALESCE(SUM(q.score), 0) AS total_score,
+  ROUND(AVG(q.score), 1) AS avg_score
+FROM users u
+LEFT JOIN quizzes q ON u.id = q.user_id
+GROUP BY u.id, u.username
+ORDER BY total_score DESC;</code></pre>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="leaderboard-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Username</th>
+                <th>Quizzes Taken</th>
+                <th>Total Points</th>
+                <th>Avg Score</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-tbody">
+              <tr>
+                <td colspan="5" class="text-center text-muted">No quiz data yet. Take your first quiz!</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: Code Concepts Documentation -->
+    <section id="tab-concepts" class="tab-content">
+      <div class="concepts-grid">
+        <!-- Card 1: Closures -->
+        <div class="card glass-card">
+          <h3>🔒 1. JavaScript Closures</h3>
+          <p class="text-muted">A closure gives an inner function access to an outer function's scope even after the outer function has returned.</p>
+          <div class="code-box">
+            <pre><code>// Client & Server Closure Example:
+function createQuizSession(quizData) {
+  let currentIndex = 0; // Private state
+  const answers = {};   // Private state
+
+  return {
+    selectAnswer(qId, option) { answers[qId] = option; },
+    getAnswers() { return { ...answers }; },
+    next() { if (currentIndex < 4) currentIndex++; },
+    getCurrent() { return quizData[currentIndex]; }
+  };
+}</code></pre>
+          </div>
+        </div>
+
+        <!-- Card 2: Async/Await -->
+        <div class="card glass-card">
+          <h3>⚡ 2. JavaScript async / await</h3>
+          <p class="text-muted">Allows writing asynchronous, non-blocking code cleanly without callback hell or nested promise chains.</p>
+          <div class="code-box">
+            <pre><code>// Async/Await Database & LLM Workflow:
+app.post('/api/quiz/generate', async (req, res) => {
+  const user = await query('INSERT INTO users ...');
+  const mcqs = await generateMCQsWithLLM(topic);
+  const quiz = await query('INSERT INTO quizzes ...');
+  res.json({ quizId: quiz.id, mcqs });
+});</code></pre>
+          </div>
+        </div>
+
+        <!-- Card 3: Relational Schema -->
+        <div class="card glass-card">
+          <h3>🗄️ 3. Relational Schema (PK & FK)</h3>
+          <p class="text-muted">Enforces data consistency and referential integrity using <code>PRIMARY KEY</code> and <code>FOREIGN KEY</code> constraints with <code>ON DELETE CASCADE</code>.</p>
+          <div class="code-box">
+            <pre><code>CREATE TABLE quizzes (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  topic VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE questions (
+  id SERIAL PRIMARY KEY,
+  quiz_id INT REFERENCES quizzes(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL
+);</code></pre>
+          </div>
+        </div>
+
+        <!-- Card 4: Structured Outputs & Prompt Engineering -->
+        <div class="card glass-card">
+          <h3>🤖 4. LLM Structured Outputs</h3>
+          <p class="text-muted">Directs the model to output strict JSON matching 5 questions with options A, B, C, D and explanations.</p>
+          <div class="code-box">
+            <pre><code>// Prompt Engineering with Strict Schema:
+const prompt = `Generate 5 MCQs on "${topic}".
+Output ONLY JSON:
+[
+  {
+    "question": "...",
+    "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+    "correct_answer": "A",
+    "explanation": "..."
+  }
+]`;</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>AI Quiz Generator Showcase</span>
+      <span>•</span>
+      <span>PostgreSQL + Express + JavaScript</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
