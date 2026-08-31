@@ -1,394 +1,684 @@
-function createQuizController(quizData) {
+const { useState, useEffect, useRef } = React;
+const { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } = ReactRouterDOM;
+
+function createQuizSession(quizData) {
   const { quizId, topic, username, questions } = quizData;
   let currentIndex = 0;
   const answers = {};
-  let secondsElapsed = 0;
-  let timerId = null;
 
   return {
     getQuizId: () => quizId,
     getTopic: () => topic,
     getUsername: () => username,
-    getTotalQuestions: () => questions.length,
+    getTotal: () => questions.length,
     getCurrentIndex: () => currentIndex,
-    
-    getCurrentQuestion() {
-      return questions[currentIndex];
-    },
-
-    selectAnswer(optionKey) {
-      const currentQ = questions[currentIndex];
-      answers[currentQ.id] = optionKey;
-    },
-
-    getSelectedAnswerForCurrent() {
-      const currentQ = questions[currentIndex];
-      return answers[currentQ.id] || null;
-    },
-
-    hasAnsweredCurrent() {
-      const currentQ = questions[currentIndex];
-      return Boolean(answers[currentQ.id]);
-    },
-
-    canGoNext() {
-      return currentIndex < questions.length - 1;
-    },
-
-    canGoPrev() {
-      return currentIndex > 0;
-    },
-
-    nextQuestion() {
-      if (currentIndex < questions.length - 1) {
-        currentIndex++;
-        return true;
-      }
-      return false;
-    },
-
-    prevQuestion() {
-      if (currentIndex > 0) {
-        currentIndex--;
-        return true;
-      }
-      return false;
-    },
-
-    isLastQuestion() {
-      return currentIndex === questions.length - 1;
-    },
-
-    getAnswersPayload() {
-      return { quizId, answers: { ...answers } };
-    },
-
-    startTimer(onTickCallback) {
-      secondsElapsed = 0;
-      if (timerId) clearInterval(timerId);
-      timerId = setInterval(() => {
-        secondsElapsed++;
-        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-        const secs = String(secondsElapsed % 60).padStart(2, '0');
-        if (onTickCallback) onTickCallback(`${mins}:${secs}`);
-      }, 1000);
-    },
-
-    stopTimer() {
-      if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
-      }
-      return secondsElapsed;
-    }
+    getCurrentQuestion: () => questions[currentIndex],
+    selectAnswer: (key) => { answers[questions[currentIndex].id] = key; },
+    getSelectedAnswer: () => answers[questions[currentIndex].id] || null,
+    hasAnswered: () => Boolean(answers[questions[currentIndex].id]),
+    canNext: () => currentIndex < questions.length - 1,
+    canPrev: () => currentIndex > 0,
+    isLast: () => currentIndex === questions.length - 1,
+    next: () => { if (currentIndex < questions.length - 1) currentIndex++; },
+    prev: () => { if (currentIndex > 0) currentIndex--; },
+    getPayload: () => ({ quizId, answers: { ...answers } })
   };
 }
 
-let activeQuiz = null;
-let lastCompletedQuizId = null;
-
-const dom = {
-  dbStatusPill: document.getElementById('db-status-pill'),
-  tabButtons: document.querySelectorAll('.tab-btn'),
-  tabContents: document.querySelectorAll('.tab-content'),
-  quizForm: document.getElementById('quiz-form'),
-  topicInput: document.getElementById('topic-input'),
-  usernameInput: document.getElementById('username-input'),
-  apikeyInput: document.getElementById('apikey-input'),
-  generateBtn: document.getElementById('generate-btn'),
-  btnText: document.querySelector('#generate-btn .btn-text'),
-  btnLoader: document.querySelector('#generate-btn .btn-loader'),
-  generatorCard: document.getElementById('generator-card'),
-  activeQuizCard: document.getElementById('active-quiz-card'),
-  resultsCard: document.getElementById('results-card'),
-  quizTopicBadge: document.getElementById('quiz-topic-badge'),
-  quizTitle: document.getElementById('quiz-title'),
-  timerDisplay: document.getElementById('timer-display'),
-  progressBar: document.getElementById('quiz-progress-bar'),
-  questionText: document.getElementById('current-question-text'),
-  optionsGrid: document.getElementById('options-grid'),
-  prevBtn: document.getElementById('prev-btn'),
-  nextBtn: document.getElementById('next-btn'),
-  submitQuizBtn: document.getElementById('submit-quiz-btn'),
-  scoreNumber: document.getElementById('score-number'),
-  scorePercentage: document.getElementById('score-percentage'),
-  resultsHeadline: document.getElementById('results-headline'),
-  answersBreakdown: document.getElementById('answers-breakdown'),
-  retakeBtn: document.getElementById('retake-btn'),
-  viewSqlJoinedBtn: document.getElementById('view-sql-joined-btn'),
-  refreshJoinBtn: document.getElementById('refresh-join-btn'),
-  joinsTbody: document.getElementById('joins-tbody'),
-  refreshLeaderboardBtn: document.getElementById('refresh-leaderboard-btn'),
-  leaderboardTbody: document.getElementById('leaderboard-tbody')
-};
-
-async function checkSystemStatus() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    if (data.postgresConnected) {
-      dom.dbStatusPill.className = 'badge badge-success';
-      dom.dbStatusPill.textContent = '● PostgreSQL Connected';
-    } else {
-      dom.dbStatusPill.className = 'badge badge-warning';
-      dom.dbStatusPill.textContent = '● In-Memory Relational Engine';
-    }
-  } catch (err) {
-    dom.dbStatusPill.className = 'badge badge-warning';
-    dom.dbStatusPill.textContent = '● Server Connecting...';
-  }
-}
-
-async function handleGenerateQuiz(e) {
-  e.preventDefault();
-
-  const topic = dom.topicInput.value.trim();
-  const username = dom.usernameInput.value.trim() || 'Anonymous';
-  const apiKey = dom.apikeyInput.value.trim() || null;
-
-  if (!topic) return;
-
-  dom.generateBtn.disabled = true;
-  dom.btnText.classList.add('hidden');
-  dom.btnLoader.classList.remove('hidden');
-
-  try {
-    const response = await fetch('/api/quiz/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, username, apiKey })
-    });
-
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to generate quiz');
-    }
-
-    activeQuiz = createQuizController(data);
-    startQuizSession();
-
-  } catch (err) {
-    alert(`Generation error: ${err.message}`);
-  } finally {
-    dom.generateBtn.disabled = false;
-    dom.btnText.classList.remove('hidden');
-    dom.btnLoader.classList.add('hidden');
-  }
-}
-
-async function handleSubmitQuiz() {
-  if (!activeQuiz) return;
-
-  activeQuiz.stopTimer();
-  const payload = activeQuiz.getAnswersPayload();
-
-  dom.submitQuizBtn.disabled = true;
-  dom.submitQuizBtn.textContent = 'Submitting & Evaluating...';
-
-  try {
-    const response = await fetch('/api/quiz/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to submit quiz');
-    }
-
-    lastCompletedQuizId = data.quizId;
-    renderResults(data.evaluation);
-
-  } catch (err) {
-    alert(`Submission error: ${err.message}`);
-    dom.submitQuizBtn.disabled = false;
-    dom.submitQuizBtn.textContent = 'Submit & Score Quiz 🚀';
-  }
-}
-
-async function fetchJoinedDetails(quizId) {
-  const targetId = quizId || lastCompletedQuizId;
-  if (!targetId) {
-    dom.joinsTbody.innerHTML = `
-      <tr>
-        <td colspan="8" class="text-center text-muted">Please generate and complete a quiz first to inspect joined relational data.</td>
-      </tr>`;
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/quiz/${targetId}/details`);
-    const result = await response.json();
-
-    if (result.success && result.data.length > 0) {
-      dom.joinsTbody.innerHTML = result.data.map((row, index) => `
-        <tr>
-          <td><strong>#${row.quiz_id}</strong></td>
-          <td>${row.topic}</td>
-          <td><code>${row.username}</code></td>
-          <td>${index + 1}</td>
-          <td>${row.question_text}</td>
-          <td><span class="badge badge-success">${row.correct_answer}</span></td>
-          <td><span class="badge ${row.is_correct ? 'badge-success' : 'badge-warning'}">${row.selected_answer || 'None'}</span></td>
-          <td>${row.is_correct ? '✅ Correct' : '❌ Incorrect'}</td>
-        </tr>
-      `).join('');
-    } else {
-      dom.joinsTbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No rows returned for Quiz #${targetId}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error fetching joined records:', err);
-  }
-}
-
-async function fetchLeaderboard() {
-  try {
-    const response = await fetch('/api/leaderboard');
-    const result = await response.json();
-
-    if (result.success && result.leaderboard.length > 0) {
-      dom.leaderboardTbody.innerHTML = result.leaderboard.map((u, i) => `
-        <tr>
-          <td><strong>#${i + 1}</strong></td>
-          <td><code>${u.username}</code></td>
-          <td>${u.total_quizzes_taken}</td>
-          <td><strong>${u.total_score} pts</strong></td>
-          <td>${u.avg_score} / 5.0</td>
-        </tr>
-      `).join('');
-    } else {
-      dom.leaderboardTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No leaderboard entries yet. Take a quiz!</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error fetching leaderboard:', err);
-  }
-}
-
-function startQuizSession() {
-  dom.generatorCard.classList.add('hidden');
-  dom.resultsCard.classList.add('hidden');
-  dom.activeQuizCard.classList.remove('hidden');
-
-  dom.quizTopicBadge.textContent = activeQuiz.getTopic();
-  activeQuiz.startTimer(timeStr => {
-    dom.timerDisplay.textContent = timeStr;
-  });
-
-  renderCurrentQuestion();
-}
-
-function renderCurrentQuestion() {
-  const currentQ = activeQuiz.getCurrentQuestion();
-  const currIndex = activeQuiz.getCurrentIndex();
-  const total = activeQuiz.getTotalQuestions();
-  const selectedAns = activeQuiz.getSelectedAnswerForCurrent();
-
-  dom.quizTitle.textContent = `Question ${currIndex + 1} of ${total}`;
-  dom.progressBar.style.width = `${((currIndex + 1) / total) * 100}%`;
-  dom.questionText.textContent = currentQ.question;
-
-  dom.optionsGrid.innerHTML = '';
-  const options = currentQ.options;
-  for (const [key, text] of Object.entries(options)) {
-    const optBtn = document.createElement('button');
-    optBtn.className = `option-btn ${selectedAns === key ? 'selected' : ''}`;
-    optBtn.innerHTML = `
-      <span class="option-key">${key}</span>
-      <span class="option-label">${text}</span>
-    `;
-    optBtn.addEventListener('click', () => {
-      activeQuiz.selectAnswer(key);
-      renderCurrentQuestion();
-    });
-    dom.optionsGrid.appendChild(optBtn);
-  }
-
-  dom.prevBtn.disabled = !activeQuiz.canGoPrev();
-
-  if (activeQuiz.isLastQuestion()) {
-    dom.nextBtn.classList.add('hidden');
-    dom.submitQuizBtn.classList.remove('hidden');
-    dom.submitQuizBtn.disabled = false;
-    dom.submitQuizBtn.textContent = 'Submit & Score Quiz 🚀';
-  } else {
-    dom.nextBtn.classList.remove('hidden');
-    dom.submitQuizBtn.classList.add('hidden');
-  }
-}
-
-function renderResults(evaluation) {
-  dom.activeQuizCard.classList.add('hidden');
-  dom.resultsCard.classList.remove('hidden');
-
-  dom.scoreNumber.textContent = `${evaluation.score}/${evaluation.total}`;
-  dom.scorePercentage.textContent = `${evaluation.percentage}%`;
-
-  if (evaluation.percentage >= 80) {
-    dom.resultsHeadline.textContent = '🎉 Excellent Job!';
-  } else if (evaluation.percentage >= 60) {
-    dom.resultsHeadline.textContent = '👍 Good Effort!';
-  } else {
-    dom.resultsHeadline.textContent = '📚 Keep Practicing!';
-  }
-
-  dom.answersBreakdown.innerHTML = evaluation.results.map((res, i) => `
-    <div class="breakdown-item ${res.isCorrect ? 'correct' : 'incorrect'}">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-        <strong>Q${i + 1}: ${res.question}</strong>
-        <span>${res.isCorrect ? '✅ Correct' : '❌ Incorrect'}</span>
+function Header({ dbConnected }) {
+  return (
+    <header className="app-header">
+      <div className="logo-group">
+        <div className="logo-icon">⚡</div>
+        <div>
+          <h1 className="logo-title">AI Quiz Generator</h1>
+          <p className="logo-subtitle">React Router • PostgreSQL Joins • LLM JSON • Closures & Hoisting</p>
+        </div>
       </div>
-      <div>
-        <span class="badge ${res.isCorrect ? 'badge-success' : 'badge-warning'}">Your Answer: ${res.selectedAnswer}</span>
-        <span class="badge badge-info" style="margin-left: 8px;">Correct Answer: ${res.correctAnswer}</span>
+      <div className="header-badges">
+        <span className={`badge ${dbConnected ? 'badge-success' : 'badge-warning'}`}>
+          {dbConnected ? '● PostgreSQL Connected' : '● In-Memory Relational Engine'}
+        </span>
+        <span className="badge badge-info">5 MCQs / Topic</span>
       </div>
-      <div class="breakdown-explanation">
-        💡 <strong>Explanation:</strong> ${res.explanation || 'N/A'}
+    </header>
+  );
+}
+
+function Navigation() {
+  return (
+    <nav className="nav-tabs">
+      <NavLink to="/" className={({ isActive }) => `tab-btn ${isActive ? 'active' : ''}`} end>
+        🎯 Quiz Studio
+      </NavLink>
+      <NavLink to="/joins" className={({ isActive }) => `tab-btn ${isActive ? 'active' : ''}`}>
+        🔍 SQL Joins
+      </NavLink>
+      <NavLink to="/leaderboard" className={({ isActive }) => `tab-btn ${isActive ? 'active' : ''}`}>
+        🏆 Leaderboard
+      </NavLink>
+      <NavLink to="/hoisting" className={({ isActive }) => `tab-btn ${isActive ? 'active' : ''}`}>
+        ⚡ Hoisting Lab (let / const)
+      </NavLink>
+      <NavLink to="/concepts" className={({ isActive }) => `tab-btn ${isActive ? 'active' : ''}`}>
+        📚 Code Concepts
+      </NavLink>
+    </nav>
+  );
+}
+
+function QuizStudio({ onQuizCompleted, lastQuizId }) {
+  const [topic, setTopic] = useState('JavaScript Closures & Hoisting');
+  const [username, setUsername] = useState('Alex');
+  const [apiKey, setApiKey] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [session, setSession] = useState(null);
+  const [questionVersion, setQuestionVersion] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  const [results, setResults] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (session && !results) {
+      setSeconds(0);
+      timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [session, results]);
+
+  async function handleGenerate(e) {
+    e.preventDefault();
+    if (!topic.trim()) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/quiz/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, username, apiKey: apiKey || null })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to generate');
+      
+      const newSession = createQuizSession(data);
+      setSession(newSession);
+      setResults(null);
+      setQuestionVersion(v => v + 1);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!session) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/quiz/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(session.getPayload())
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Submission failed');
+      
+      setResults(data.evaluation);
+      onQuizCompleted(data.quizId);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const formatTime = (sec) => {
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  if (results) {
+    return (
+      <div className="card glass-card">
+        <div className="results-header">
+          <div className="score-circle">
+            <span id="score-number">{results.score}/{results.total}</span>
+            <span id="score-percentage">{results.percentage}%</span>
+          </div>
+          <div>
+            <h2>{results.percentage >= 80 ? '🎉 Excellent Job!' : results.percentage >= 60 ? '👍 Good Effort!' : '📚 Keep Practicing!'}</h2>
+            <p className="card-desc">Relational PostgreSQL record updated.</p>
+          </div>
+        </div>
+
+        <div className="breakdown-list">
+          {results.results.map((r, i) => (
+            <div key={i} className={`breakdown-item ${r.isCorrect ? 'correct' : 'incorrect'}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <strong>Q{i + 1}: {r.question}</strong>
+                <span>{r.isCorrect ? '✅ Correct' : '❌ Incorrect'}</span>
+              </div>
+              <div>
+                <span className={`badge ${r.isCorrect ? 'badge-success' : 'badge-warning'}`}>Your: {r.selectedAnswer}</span>
+                <span className="badge badge-info" style={{ marginLeft: 8 }}>Correct: {r.correctAnswer}</span>
+              </div>
+              <div className="breakdown-explanation">💡 <strong>Explanation:</strong> {r.explanation}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="results-actions">
+          <button className="btn btn-primary" onClick={() => { setSession(null); setResults(null); }}>Create Another Quiz</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/joins')}>Inspect Joined SQL Rows 🔍</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (session) {
+    const q = session.getCurrentQuestion();
+    const currIdx = session.getCurrentIndex();
+    const total = session.getTotal();
+    const selected = session.getSelectedAnswer();
+
+    return (
+      <div className="card glass-card">
+        <div className="quiz-header">
+          <div>
+            <span className="badge badge-accent">{session.getTopic()}</span>
+            <h2 className="quiz-title">Question {currIdx + 1} of {total}</h2>
+          </div>
+          <div className="quiz-timer-pill">⏱️ {formatTime(seconds)}</div>
+        </div>
+
+        <div className="progress-bar-container">
+          <div className="progress-bar" style={{ width: `${((currIdx + 1) / total) * 100}%` }}></div>
+        </div>
+
+        <div className="question-container">
+          <h3 className="question-text">{q.question}</h3>
+          <div className="options-grid">
+            {Object.entries(q.options).map(([key, text]) => (
+              <button
+                key={key}
+                className={`option-btn ${selected === key ? 'selected' : ''}`}
+                onClick={() => {
+                  session.selectAnswer(key);
+                  setQuestionVersion(v => v + 1);
+                }}
+              >
+                <span className="option-key">{key}</span>
+                <span className="option-label">{text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="quiz-actions">
+          <button
+            className="btn btn-secondary"
+            disabled={!session.canPrev()}
+            onClick={() => { session.prev(); setQuestionVersion(v => v + 1); }}
+          >
+            ← Previous
+          </button>
+
+          {!session.isLast() ? (
+            <button
+              className="btn btn-secondary"
+              onClick={() => { session.next(); setQuestionVersion(v => v + 1); }}
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              className="btn btn-success"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              {submitting ? 'Scoring...' : 'Submit & Score Quiz 🚀'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card glass-card">
+      <h2 className="card-title">Generate a 5-Question MCQ Quiz</h2>
+      <p className="card-desc">Enter any topic. The system generates structured JSON with 5 questions and saves to PostgreSQL.</p>
+      
+      <form onSubmit={handleGenerate} className="form-grid">
+        <div className="form-group">
+          <label>Topic</label>
+          <input
+            type="text"
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+            placeholder="e.g. JavaScript Hoisting, Python Async, SQL Indexes..."
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Your Name</label>
+          <input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="e.g. Alex"
+          />
+        </div>
+
+        <div className="form-group full-width">
+          <label className="optional-label">
+            Gemini / OpenAI API Key <span>(Optional - Built-in fallback active if blank)</span>
+          </label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder="Optional API Key"
+          />
+        </div>
+
+        <button type="submit" className="btn btn-primary full-width" disabled={loading}>
+          {loading ? '⏳ Generating 5 Structured MCQs...' : 'Generate 5 MCQs with AI'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function SqlJoins({ lastQuizId }) {
+  const [data, setData] = useState([]);
+  const [sql, setSql] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function loadJoins() {
+    if (!lastQuizId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/quiz/${lastQuizId}/details`);
+      const json = await res.json();
+      if (json.success) {
+        setData(json.data);
+        setSql(json.sqlQuery);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadJoins();
+  }, [lastQuizId]);
+
+  return (
+    <div className="card glass-card">
+      <div className="card-header-flex">
+        <div>
+          <h2 className="card-title">Relational Schema & SQL Joins Inspector</h2>
+          <p className="card-desc">Live multi-table query joining <code>quizzes</code>, <code>users</code>, <code>questions</code>, and <code>user_answers</code>.</p>
+        </div>
+        <button className="btn btn-sm btn-secondary" onClick={loadJoins} disabled={loading}>
+          {loading ? 'Running...' : '🔄 Run SQL Join'}
+        </button>
+      </div>
+
+      <div className="code-box">
+        <div className="code-box-header">SQL QUERY (INNER JOIN + LEFT JOIN)</div>
+        <pre><code>{sql || `SELECT 
+  q.id AS quiz_id, q.topic, q.score, u.username,
+  k.id AS question_id, k.question_text, k.options, k.correct_answer,
+  a.selected_answer, a.is_correct
+FROM quizzes q
+INNER JOIN users u ON q.user_id = u.id
+INNER JOIN questions k ON q.id = k.quiz_id
+LEFT JOIN user_answers a ON k.id = a.question_id AND q.id = a.quiz_id
+WHERE q.id = $1;`}</code></pre>
+      </div>
+
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Quiz ID (PK)</th>
+              <th>Topic</th>
+              <th>Username (FK: users)</th>
+              <th>Q#</th>
+              <th>Question Text</th>
+              <th>Correct</th>
+              <th>User Answer</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.length > 0 ? (
+              data.map((row, idx) => (
+                <tr key={idx}>
+                  <td><strong>#{row.quiz_id}</strong></td>
+                  <td>{row.topic}</td>
+                  <td><code>{row.username}</code></td>
+                  <td>{idx + 1}</td>
+                  <td>{row.question_text}</td>
+                  <td><span className="badge badge-success">{row.correct_answer}</span></td>
+                  <td><span className={`badge ${row.is_correct ? 'badge-success' : 'badge-warning'}`}>{row.selected_answer || 'None'}</span></td>
+                  <td>{row.is_correct ? '✅ Correct' : '❌ Incorrect'}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" className="text-center text-muted">
+                  {lastQuizId ? 'No records returned for quiz.' : 'Generate and submit a quiz in Quiz Studio first to inspect joined rows.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
-  `).join('');
+  );
 }
 
-dom.quizForm.addEventListener('submit', handleGenerateQuiz);
+function Leaderboard() {
+  const [leaders, setLeaders] = useState([]);
+  const [sql, setSql] = useState('');
+  const [loading, setLoading] = useState(false);
 
-dom.nextBtn.addEventListener('click', () => {
-  if (activeQuiz.nextQuestion()) {
-    renderCurrentQuestion();
+  async function loadLeaderboard() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/leaderboard');
+      const json = await res.json();
+      if (json.success) {
+        setLeaders(json.leaderboard);
+        setSql(json.sqlQuery);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }
-});
 
-dom.prevBtn.addEventListener('click', () => {
-  if (activeQuiz.prevQuestion()) {
-    renderCurrentQuestion();
-  }
-});
+  useEffect(() => {
+    loadLeaderboard();
+  }, []);
 
-dom.submitQuizBtn.addEventListener('click', handleSubmitQuiz);
+  return (
+    <div className="card glass-card">
+      <div className="card-header-flex">
+        <div>
+          <h2 className="card-title">User Performance Leaderboard</h2>
+          <p className="card-desc">SQL aggregate query using <code>LEFT JOIN</code>, <code>COUNT()</code>, <code>SUM()</code>, and <code>GROUP BY</code>.</p>
+        </div>
+        <button className="btn btn-sm btn-secondary" onClick={loadLeaderboard} disabled={loading}>
+          {loading ? 'Refreshing...' : '🔄 Refresh'}
+        </button>
+      </div>
 
-dom.retakeBtn.addEventListener('click', () => {
-  dom.resultsCard.classList.add('hidden');
-  dom.activeQuizCard.classList.add('hidden');
-  dom.generatorCard.classList.remove('hidden');
-});
+      <div className="code-box">
+        <div className="code-box-header">AGGREGATE SQL JOIN QUERY</div>
+        <pre><code>{sql || `SELECT 
+  u.username,
+  COUNT(q.id) AS total_quizzes_taken,
+  COALESCE(SUM(q.score), 0) AS total_score,
+  ROUND(AVG(q.score), 1) AS avg_score
+FROM users u
+LEFT JOIN quizzes q ON u.id = q.user_id
+GROUP BY u.id, u.username
+ORDER BY total_score DESC;`}</code></pre>
+      </div>
 
-dom.viewSqlJoinedBtn.addEventListener('click', () => {
-  switchTab('tab-joins');
-  fetchJoinedDetails(lastCompletedQuizId);
-});
-
-dom.refreshJoinBtn.addEventListener('click', () => fetchJoinedDetails(lastCompletedQuizId));
-dom.refreshLeaderboardBtn.addEventListener('click', fetchLeaderboard);
-
-function switchTab(tabId) {
-  dom.tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-  dom.tabContents.forEach(c => c.classList.toggle('active', c.id === tabId));
-
-  if (tabId === 'tab-joins') fetchJoinedDetails(lastCompletedQuizId);
-  if (tabId === 'tab-leaderboard') fetchLeaderboard();
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Username</th>
+              <th>Quizzes Taken</th>
+              <th>Total Points</th>
+              <th>Avg Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaders.length > 0 ? (
+              leaders.map((u, i) => (
+                <tr key={i}>
+                  <td><strong>#{i + 1}</strong></td>
+                  <td><code>{u.username}</code></td>
+                  <td>{u.total_quizzes_taken}</td>
+                  <td><strong>{u.total_score} pts</strong></td>
+                  <td>{u.avg_score} / 5.0</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="text-center text-muted">No quiz data yet. Take a quiz!</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
-dom.tabButtons.forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-});
+function HoistingLab() {
+  const [serverHoistingResults, setServerHoistingResults] = useState(null);
 
-checkSystemStatus();
+  useEffect(() => {
+    fetch('/api/hoisting-demo')
+      .then(r => r.json())
+      .then(setServerHoistingResults)
+      .catch(console.error);
+  }, []);
+
+  return (
+    <div className="concepts-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="card glass-card">
+        <h3>1. `let` Hoisting & Temporal Dead Zone (TDZ)</h3>
+        <p className="card-desc">`let` declarations are hoisted into block scope but remain uninitialized in the TDZ.</p>
+        <div className="code-box">
+          <div className="code-box-header">CONCRETE CODE SNIPPET (let)</div>
+          <pre><code>{`// Accessing 'num' in its TDZ throws ReferenceError:
+try {
+  console.log(num); // Throws ReferenceError!
+  let num = 42;     // TDZ ends here
+} catch (err) {
+  console.log(err.name); // "ReferenceError"
+  console.log(err.message); // "Cannot access 'num' before initialization"
+}`}</code></pre>
+        </div>
+        {serverHoistingResults?.letDemo && (
+          <div className="breakdown-explanation" style={{ borderLeft: '3px solid var(--accent-rose)' }}>
+            <strong>Live Output:</strong> <code>{serverHoistingResults.letDemo.errorName}: {serverHoistingResults.letDemo.errorMessage}</code>
+          </div>
+        )}
+      </div>
+
+      <div className="card glass-card">
+        <h3>2. `const` Hoisting & Immutable Binding</h3>
+        <p className="card-desc">`const` is also hoisted in the TDZ, requires initialization at declaration, and cannot be reassigned.</p>
+        <div className="code-box">
+          <div className="code-box-header">CONCRETE CODE SNIPPET (const)</div>
+          <pre><code>{`// 1. TDZ ReferenceError on pre-access:
+try {
+  console.log(PI); // Throws ReferenceError!
+  const PI = 3.14159;
+} catch (err) {
+  console.log(err.name); // "ReferenceError"
+}
+
+// 2. SyntaxError if declared without initializer:
+// const TAX_RATE; // SyntaxError: Missing initializer
+
+// 3. TypeError on reassignment:
+const MAX = 100;
+// MAX = 200; // TypeError: Assignment to constant variable`}</code></pre>
+        </div>
+        {serverHoistingResults?.constDemo && (
+          <div className="breakdown-explanation" style={{ borderLeft: '3px solid var(--accent-amber)' }}>
+            <strong>Live Output:</strong> <code>{serverHoistingResults.constDemo.errorName}: {serverHoistingResults.constDemo.errorMessage}</code>
+          </div>
+        )}
+      </div>
+
+      <div className="card glass-card">
+        <h3>3. `var` vs `let` / `const` Hoisting Comparison</h3>
+        <p className="card-desc">`var` is initialized to `undefined` during the compilation phase, while `let`/`const` stay uninitialized.</p>
+        <div className="code-box">
+          <div className="code-box-header">CONCRETE CODE COMPARISON</div>
+          <pre><code>{`// var behavior (initialized to undefined):
+console.log(v); // Output: undefined
+var v = 10;
+
+// let behavior (uninitialized / TDZ):
+console.log(l); // ReferenceError: Cannot access 'l'
+let l = 10;`}</code></pre>
+        </div>
+      </div>
+
+      <div className="card glass-card">
+        <h3>4. Block Scope & Variable Shadowing</h3>
+        <p className="card-desc">`let` and `const` create fresh lexical bindings inside `{ ... }` blocks without polluting outer scopes.</p>
+        <div className="code-box">
+          <div className="code-box-header">BLOCK SCOPING SNIPPET</div>
+          <pre><code>{`const scopeVal = "global";
+{
+  // Inner block shadows outer variable:
+  const scopeVal = "block-scoped";
+  console.log(scopeVal); // "block-scoped"
+}
+console.log(scopeVal);   // "global"`}</code></pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Concepts() {
+  return (
+    <div className="concepts-grid">
+      <div className="card glass-card">
+        <h3>🔒 1. JavaScript Closures</h3>
+        <p className="card-desc">Enables inner functions to access and protect outer function variables after completion.</p>
+        <div className="code-box">
+          <pre><code>{`function createQuizSession(quizData) {
+  let currentIndex = 0; // Private state
+  const answers = {};   // Private state
+
+  return {
+    selectAnswer(qId, key) { answers[qId] = key; },
+    getAnswers() { return { ...answers }; },
+    next() { currentIndex++; }
+  };
+}`}</code></pre>
+        </div>
+      </div>
+
+      <div className="card glass-card">
+        <h3>⚡ 2. JavaScript async / await</h3>
+        <p className="card-desc">Non-blocking asynchronous flow for database and LLM API transactions.</p>
+        <div className="code-box">
+          <pre><code>{`app.post('/api/quiz/generate', async (req, res) => {
+  const user = await query('INSERT INTO users ...');
+  const mcqs = await generateMCQsWithLLM(topic);
+  const quiz = await query('INSERT INTO quizzes ...');
+  res.json({ quizId: quiz.id, mcqs });
+});`}</code></pre>
+        </div>
+      </div>
+
+      <div className="card glass-card">
+        <h3>🗄️ 3. Relational Schema (PK & FK)</h3>
+        <p className="card-desc">Cascading constraints enforce database consistency.</p>
+        <div className="code-box">
+          <pre><code>{`CREATE TABLE quizzes (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  topic VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE questions (
+  id SERIAL PRIMARY KEY,
+  quiz_id INT REFERENCES quizzes(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL
+);`}</code></pre>
+        </div>
+      </div>
+
+      <div className="card glass-card">
+        <h3>🤖 4. LLM Structured Outputs</h3>
+        <p className="card-desc">Engineered prompt enforces strict 5-question JSON array.</p>
+        <div className="code-box">
+          <pre><code>{`const prompt = \`Generate 5 MCQs on "\${topic}".
+Output ONLY JSON:
+[
+  {
+    "question": "...",
+    "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+    "correct_answer": "A",
+    "explanation": "..."
+  }
+]\`;`}</code></pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [dbConnected, setDbConnected] = useState(false);
+  const [lastQuizId, setLastQuizId] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/status')
+      .then(r => r.json())
+      .then(d => setDbConnected(Boolean(d.postgresConnected)))
+      .catch(() => setDbConnected(false));
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <div className="app-container">
+        <Header dbConnected={dbConnected} />
+        <Navigation />
+
+        <main className="tab-content active" style={{ display: 'block' }}>
+          <Routes>
+            <Route
+              path="/"
+              element={<QuizStudio onQuizCompleted={id => setLastQuizId(id)} lastQuizId={lastQuizId} />}
+            />
+            <Route path="/joins" element={<SqlJoins lastQuizId={lastQuizId} />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/hoisting" element={<HoistingLab />} />
+            <Route path="/concepts" element={<Concepts />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+
+        <footer className="app-footer">
+          <span>AI Quiz Generator</span>
+          <span>•</span>
+          <span>React Router + PostgreSQL + Closures + Hoisting</span>
+        </footer>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);

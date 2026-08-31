@@ -3,6 +3,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDB, query, isConnectedToPostgres } from './db.js';
 import { generateMCQsWithLLM, promptEngine } from './llm.js';
+import {
+  demonstrateVarHoisting,
+  demonstrateLetHoisting,
+  demonstrateConstHoisting,
+  demonstrateBlockScopeShadowing,
+  demonstrateFunctionHoistingVsConst
+} from './hoistingDemo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -198,12 +205,26 @@ app.get('/api/leaderboard', async (req, res) => {
   }
 });
 
+app.get('/api/hoisting-demo', (req, res) => {
+  res.json({
+    varDemo: demonstrateVarHoisting(),
+    letDemo: demonstrateLetHoisting(),
+    constDemo: demonstrateConstHoisting(),
+    blockScopeDemo: demonstrateBlockScopeShadowing(),
+    functionVsConstDemo: demonstrateFunctionHoistingVsConst()
+  });
+});
+
 app.get('/api/status', (req, res) => {
   res.json({
     postgresConnected: isConnectedToPostgres,
     llmStats: promptEngine.getStats(),
     nodeVersion: process.version
   });
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 async function startServer() {
